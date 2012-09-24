@@ -7,6 +7,7 @@ module Spree
     has_one :product, :through => :variant
     has_many :adjustments, :as => :adjustable, :dependent => :destroy
 
+    after_initialize :check_for_lock
     before_validation :copy_price
 
     validates :variant, :presence => true
@@ -22,6 +23,10 @@ module Spree
 
     after_save :update_order
     after_destroy :update_order
+
+    def check_for_lock
+      readonly! if order.locked_at.present?
+    end
 
     def copy_price
       self.price = variant.price if variant && price.nil?

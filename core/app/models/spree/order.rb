@@ -60,6 +60,7 @@ module Spree
     before_validation :clone_billing_address, :if => :use_billing?
     attr_accessor :use_billing
 
+    after_initialize :check_for_lock
     before_create :link_by_email
     after_create :create_tax_charge!
 
@@ -99,6 +100,10 @@ module Spree
     # Use this method in other gems that wish to register their own custom logic that should be called after Order#updat
     def self.register_update_hook(hook)
       self.update_hooks.add(hook)
+    end
+
+    def check_for_lock
+      readonly! if locked_at.present?
     end
 
     # For compatiblity with Calculator::PriceSack
@@ -191,6 +196,8 @@ module Spree
     # This method should never do anything to the Order that results in a save call on the object (otherwise you will end
     # up in an infinite recursion as the associations try to save and then in turn try to call +update!+ again.)
     def update!
+      raise ActiveRecord::ReadOnlyRecord if locked_at.present?
+
       update_totals
       update_payment_state
 
@@ -216,6 +223,7 @@ module Spree
       end
 
       update_hooks.each { |hook| self.send hook }
+
     end
 
     def clone_billing_address
@@ -265,6 +273,7 @@ module Spree
 
     # FIXME refactor this method and implement validation using validates_* utilities
     def generate_order_number
+      errors.add('is readonly') if locked_at.present?
       record = true
       while record
         random = "R#{Array.new(9){rand(9)}.join}"
